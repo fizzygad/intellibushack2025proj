@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { io } from "socket.io-client";
+import SLdetector from "./SLdetector";
 
 const SOCKET_URL = "http://localhost:5000";
 
@@ -154,6 +155,20 @@ function App() {
           <button onClick={() => playTTS("Hola, esto es una prueba", "es")}>
             🔊 Test Spanish Audio
           </button>
+          <SLdetector
+            onDetect={(text) => {
+              console.log("🤟 Detected sign:", text);
+              if (socket && text) {
+                socket.emit("speech_text", {
+                  roomId,
+                  userId,
+                  text,
+                  sourceLang: "en",
+                  targetLang: "es",
+                });
+              }
+            }}
+          />
 
           <h4>Last Translation: {lastTranslated}</h4>
           <ul>
