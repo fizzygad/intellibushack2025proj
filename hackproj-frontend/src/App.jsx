@@ -1,5 +1,4 @@
-//import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 
 const SOCKET_URL = "http://localhost:5000";
@@ -11,50 +10,78 @@ function App() {
   const [userId, setUserId] = useState("");
   const [joined, setJoined] = useState(false);
   const [lastTranslated, setLastTranslated] = useState("");
+  const [lastLang, setLastLang] = useState(""); // 🆕 store last language
   const [messages, setMessages] = useState([]);
   const [voices, setVoices] = useState([]);
 
   // ---- Load voices on startup ----
   useEffect(() => {
-    const tryLoad = () => {
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length > 0) {
-        setVoices(voices);
-        console.log("✅ Voices loaded automatically.");
+    const loadVoices = () => {
+      const v = window.speechSynthesis.getVoices();
+      if (v.length > 0) {
+        console.log("✅ Voices loaded:", v.map(vo => `${vo.name} (${vo.lang})`));
+        setVoices(v);
       } else {
-        console.warn("⚠️ Voices not ready. Waiting for user interaction...");
-        const handler = () => {
-          const newVoices = window.speechSynthesis.getVoices();
-          if (newVoices.length > 0) {
-            setVoices(newVoices);
-            console.log("✅ Voices loaded after user interaction.");
-            window.removeEventListener("click", handler);
-          }
+        console.warn("🕓 Waiting for voices...");
+        window.speechSynthesis.onvoiceschanged = () => {
+          const voicesNow = window.speechSynthesis.getVoices();
+          console.log("✅ Voices ready after onvoiceschanged:", voicesNow.length);
+          setVoices(voicesNow);
         };
-        window.addEventListener("click", handler, { once: true });
       }
     };
-    tryLoad();
+    loadVoices();
   }, []);
 
+  // ---- Text-to-Speech ----
+  const playTTS = useCallback((text, lang) => {
+    if (!text) return;
+    if (voices.length === 0) return console.warn("⚠️ No voices available yet.");
 
-  // ---- Socket setup ----
+    const normalized = lang?.toLowerCase().slice(0, 2);
+    const targetLangCode = normalized === "es" ? "es-ES" : "en-US";
+
+    const voice =
+      voices.find(v => v.lang.startsWith(targetLangCode)) ||
+      voices.find(v => v.name.toLowerCase().includes("google")) ||
+      voices[0];
+
+    if (!voice) {
+      console.warn(`⚠️ No matching voice found for ${targetLangCode}`);
+      return;
+    }
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.voice = voice;
+    utter.lang = voice.lang;
+    utter.rate = 1;
+
+    console.log(`🔈 Speaking with: ${voice.name} (${voice.lang})`);
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utter);
+  }, [voices]);
+
+  // ---- Socket setup (single instance) ----
   useEffect(() => {
+    if (voices.length === 0) return; // wait until voices are ready
+
     const s = io(SOCKET_URL);
     setSocket(s);
 
     s.on("connect", () => console.log("🟢 Connected to server"));
+
     s.on("translated_text", (payload) => {
       console.log("📩 Received translation:", payload);
-      setMessages((prev) => [...prev, payload]);
+      setMessages(prev => [...prev, payload]);
       playTTS(payload.translated, payload.targetLang);
       setLastTranslated(payload.translated);
+      setLastLang(payload.targetLang); // 🆕 store language for repeat
     });
 
     s.on("user_joined", ({ username }) => console.log(`${username} joined`));
 
     return () => s.disconnect();
-  }, []);
+  }, [voices, playTTS]);
 
   // ---- Join Room ----
   const joinRoom = () => {
@@ -62,11 +89,7 @@ function App() {
     const id = crypto.randomUUID();
     setUserId(id);
 
-    socket.emit("join_room", {
-      roomId,
-      userId: id,
-      username,
-    });
+    socket.emit("join_room", { roomId, userId: id, username });
     setJoined(true);
   };
 
@@ -89,39 +112,10 @@ function App() {
     recognition.start();
   };
 
-  // ---- Text-to-Speech ----
-  const playTTS = (text, lang) => {
-    if (!text) return;
-    if (voices.length === 0) {
-      console.warn("⚠️ No voices available yet.");
-      return;
-    }
-
-    if (voices.length === 0) {
-      const fallback = window.speechSynthesis.getVoices();
-      if (fallback.length > 0) setVoices(fallback);
-    }
-
-    const normalized = lang?.toLowerCase().slice(0, 2);
-    const targetLangCode = normalized === "es" ? "es-ES" : "en-US";
-
-    const selectedVoice =
-      voices.find(v => v.lang.startsWith(targetLangCode)) ||
-      voices.find(v => v.name.toLowerCase().includes("google")) ||
-      voices[0];
-
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.voice = selectedVoice;
-    utter.lang = selectedVoice.lang;
-    utter.rate = 1;
-
-    console.log(`🔈 Using voice: ${selectedVoice.name} (${selectedVoice.lang})`);
-
-    // Cancel queued speech and play
-    setTimeout(() => {
-      speechSynthesis.cancel();
-      speechSynthesis.speak(utter);
-    }, 250);
+  // ---- 🆕 Repeat last translated audio ----
+  const repeatTranslation = () => {
+    if (!lastTranslated) return alert("No translation to repeat yet!");
+    playTTS(lastTranslated, lastLang);
   };
 
   return (
@@ -144,6 +138,7 @@ function App() {
       ) : (
         <div>
           <button onClick={handleSpeak}>🎙️ Speak</button>
+          <button onClick={repeatTranslation}>🔁 Repeat Last</button> {/* 🆕 */}
           <button onClick={() => {
             const v = window.speechSynthesis.getVoices();
             if (v.length > 0) {
@@ -158,12 +153,6 @@ function App() {
           </button>
           <button onClick={() => playTTS("Hola, esto es una prueba", "es")}>
             🔊 Test Spanish Audio
-          </button>
-          <button onClick={() => playTTS("Hello, this is a test", "en")}>
-            🔊 Test English Audio
-          </button>
-          <button onClick={() => console.log(voices)}>
-            🧠 List Voices (Debug)
           </button>
 
           <h4>Last Translation: {lastTranslated}</h4>

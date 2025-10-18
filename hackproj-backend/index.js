@@ -95,13 +95,17 @@ io.on("connection", (socket) => {
         [roomId, userId, text, translatedText, sourceLang, targetLang]
       );
 
-      socket.to(roomId).emit("translated_text", {
+      const payload = {
         from: userId,
         original: text,
         translated: translatedText,
         sourceLang,
         targetLang,
-      });
+      };
+
+      socket.emit("translated_text", payload);       // send back to sender
+      socket.to(roomId).emit("translated_text", payload); // send to others
+
     } catch (err) {
       console.error(" Translation error:", err.message);
       socket.emit("error_event", { message: "Translation failed." });
