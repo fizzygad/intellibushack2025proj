@@ -1,42 +1,332 @@
+/* ========================================================== */
+/* GLOBAL & BASE STYLES                     */
+/* ========================================================== */
+
+body {
+    background-color: #90cdf4; /* Figma light blue background */
+    min-height: 100vh;
+    margin: 0;
+    font-family: 'Arial', sans-serif;
+    color: #333; /* Dark text for contrast */
+}
+
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+    max-width: none; /* Remove max-width to let body control width */
+    margin: 0;
+    padding: 0;
+    text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Base style for all screens (flex for vertical centering) */
+.screen-container {
+    min-height: 100vh;
+    padding-top: 60px; /* Space for the header */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Global Card Wrapper (used for Login, Signup, Profile, Preferences) */
+.white-card {
+    background-color: white;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    width: 90%;
+    max-width: 600px;
+    margin-bottom: 50px;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+/* General Input Styling */
+.form-input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 10px; /* More rounded corners */
+    box-sizing: border-box;
 }
 
-.card {
-  padding: 2em;
+/* Button Styling */
+.btn-primary {
+    background-color: #4dc0b5; /* A shade of blue/green for main actions */
+    color: white;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+.btn-primary:hover {
+    background-color: #38a1a3;
 }
 
-.read-the-docs {
-  color: #888;
+/* Link/Toggle Text Styling */
+.toggle-text {
+    color: #4dc0b5;
+    cursor: pointer;
+    margin-top: 15px;
+    font-size: 0.9rem;
+    display: block;
+}
+
+/* ========================================================== */
+/* HEADER STYLES                        */
+/* ========================================================== */
+
+.app-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 40px;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    z-index: 100;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.nav-links a {
+    margin-left: 25px;
+    color: #333;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.nav-links a:hover {
+    color: #4dc0b5;
+}
+
+.btn-review {
+    background-color: black;
+    color: white;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+/* ========================================================== */
+/* SCREEN SPECIFIC STYLES                */
+/* ========================================================== */
+
+/* --- Landing Screen (Screenshot 2025-10-19 093807.png) --- */
+.landing-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 0;
+    max-width: 600px;
+    text-align: center;
+}
+
+.landing-title {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-top: 20px;
+    color: black;
+}
+
+.landing-tagline {
+    font-size: 1.2rem;
+    color: #555;
+    margin-bottom: 40px;
+    max-width: 400px;
+}
+
+.btn-landing-login {
+    background-color: #4dc0b5;
+    padding: 15px 40px;
+    border-radius: 30px;
+    font-size: 1.1rem;
+}
+
+/* --- Auth Forms (Login/Signup) --- */
+
+.auth-form-container {
+    max-width: 400px;
+}
+
+.auth-form-container h3 {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.form-row {
+    display: flex;
+    gap: 20px;
+}
+
+.form-field-group {
+    flex: 1;
+}
+
+/* --- Room Join/Create Screen (Screenshot 2025-10-19 095331.png) --- */
+
+.room-setup-area {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 100px 0;
+    text-align: center;
+}
+
+.room-setup-area h2 {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 50px;
+    color: black;
+}
+
+.room-input-group {
+    display: flex;
+    align-items: center;
+    width: 80%;
+    max-width: 600px;
+}
+
+.btn-room-action {
+    background-color: black;
+    color: white;
+    padding: 15px 40px;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.room-id-input {
+    flex-grow: 1;
+    height: 60px;
+    padding: 0 20px;
+    margin: 0 20px;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    font-size: 1.2rem;
+}
+
+/* --- VST Room Screens (image_d578a4.png, image_d5757d.png) --- */
+
+.vst-room-main {
+    background-color: white;
+    width: 90%;
+    max-width: 1200px;
+    height: 70vh;
+    border-radius: 20px;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.translation-output-box {
+    position: absolute;
+    top: 20px;
+    width: 200px;
+    height: 40px;
+    background-color: #e0f2f1; /* Light teal for visibility */
+    border-radius: 5px;
+}
+
+.sign-video-area {
+    position: absolute;
+    top: 50px;
+    right: 50px;
+    width: 300px;
+    height: 200px;
+    background-color: #eee;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.controls-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.control-btn {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    margin: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-mic {
+    background-color: black;
+    color: white;
+}
+
+.btn-end {
+    background-color: red;
+    color: white;
+}
+
+/* --- Preferences/Review Screen (image_d5753b.png) --- */
+
+.preferences-list a {
+    display: block;
+    background-color: #e0f7fa; /* Very light blue */
+    color: black;
+    font-size: 1.2rem;
+    font-weight: bold;
+    padding: 20px;
+    margin-bottom: 15px;
+    border-radius: 10px;
+    text-align: left;
+    text-decoration: none;
+    transition: background-color 0.2s;
+}
+
+.preferences-list a:hover {
+    background-color: #b2ebf2;
+}
+
+/* --- Profile Edit Screen (image_d571b6.png) --- */
+
+.profile-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.profile-full-width {
+    grid-column: 1 / -1;
+}
+
+.saved-phrases-textarea {
+    width: 100%;
+    min-height: 200px;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    box-sizing: border-box;
+    font-size: 1rem;
+    resize: vertical;
 }
