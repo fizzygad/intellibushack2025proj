@@ -3,8 +3,8 @@ import { io } from "socket.io-client";
 import SLdetector from "./SLdetector";
 import axios from "axios";
 
-const SOCKET_URL = "http://localhost:5000";
-const API_URL = "http://localhost:5000/auth";
+const SOCKET_URL = "https://omnivst-backend.onrender.com:5000";
+const API_URL = "https://omnivst-backend.onrender.com/auth";
 
 function App() {
   const [socket, setSocket] = useState(null);

@@ -14,7 +14,7 @@ const pool = new Pool({
   database: process.env.POSTGRES_DB || "minidatabase",
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecret123";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // --- User Signup ---
 router.post("/signup", async (req, res) => {

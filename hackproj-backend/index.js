@@ -11,8 +11,17 @@ import authRoutes from "./routes/auth.js";
 dotenv.config();
 
 const app = express();
-app.use(cors());
 app.use(express.json());
+
+const allowedOrigins = [
+  "http://localhost:5000", // for local dev
+  "https://omnivst.vercel.app" // your Vercel domain
+];
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 
 
 const { Pool } = pkg;
