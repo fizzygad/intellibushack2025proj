@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, React } from "react";
 import { io } from "socket.io-client";
 import SLdetector from "./SLdetector";
 import axios from "axios";
+import './App.css';
 
-const SOCKET_URL = "http://localhost:5000";
-const API_URL = "http://localhost:5000/auth";
+const SOCKET_URL = "https://omnivst-backend.onrender.com";
+const API_URL = "https://omnivst-backend.onrender.com/auth";
 
 // Component to simulate the Navigation Header
 const AppHeader = ({ token, setScreen }) => (
@@ -48,20 +49,73 @@ function App() {
   const [lastName, setLastName] = useState("");
   const [reEnterPassword, setReEnterPassword] = useState("");
 
-
   // ---- Load voices on startup ----
   useEffect(() => {
-    // ... (TTS/Voices logic remains unchanged)
+    const loadVoices = () => {
+      const v = window.speechSynthesis.getVoices();
+      if (v.length > 0) {
+        console.log("✅ Voices loaded:", v.map(vo => `${vo.name} (${vo.lang})`));
+        setVoices(v);
+      } else {
+        console.warn("🕓 Waiting for voices...");
+        window.speechSynthesis.onvoiceschanged = () => {
+          const voicesNow = window.speechSynthesis.getVoices();
+          console.log("✅ Voices ready after onvoiceschanged:", voicesNow.length);
+          setVoices(voicesNow);
+        };
+      }
+    };
+    loadVoices();
   }, []);
 
   // ---- Text-to-Speech ----
   const playTTS = useCallback((text, lang) => {
-    // ... (TTS logic remains unchanged)
+    if (!text) return;
+    if (voices.length === 0) return console.warn("⚠️ No voices available yet.");
+
+    const normalized = lang?.toLowerCase().slice(0, 2);
+    const targetLangCode = normalized === "es" ? "es-ES" : "en-US";
+
+    const voice =
+      voices.find(v => v.lang.startsWith(targetLangCode)) ||
+      voices.find(v => v.name.toLowerCase().includes("google")) ||
+      voices[0];
+
+    if (!voice) {
+      console.warn(`⚠️ No matching voice found for ${targetLangCode}`);
+      return;
+    }
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.voice = voice;
+    utter.lang = voice.lang;
+    utter.rate = 1;
+
+    console.log(`🔈 Speaking with: ${voice.name} (${voice.lang})`);
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utter);
   }, [voices]);
 
   // ---- Socket setup (single instance) ----
   useEffect(() => {
-    // ... (Socket logic remains unchanged)
+    if (!token || voices.length === 0) return; // wait until voices are ready
+
+    const s = io(SOCKET_URL, { auth: { token } });
+    setSocket(s);
+
+    s.on("connect", () => console.log("🟢 Connected to server"));
+
+    s.on("translated_text", (payload) => {
+      console.log("📩 Received translation:", payload);
+      setMessages(prev => [...prev, payload]);
+      playTTS(payload.translated, payload.targetLang);
+      setLastTranslated(payload.translated);
+      setLastLang(payload.targetLang); // 🆕 store language for repeat
+    });
+
+    s.on("user_joined", ({ username }) => console.log(`${username} joined`));
+
+    return () => s.disconnect();
   }, [token, voices, playTTS]);
 
   // ---- Signup/Login ----
@@ -112,12 +166,28 @@ function App() {
 
   // ---- Speech-to-Text ----
   const handleSpeak = () => {
-    // ... (Speech-to-Text logic remains unchanged)
+    if (!socket) return alert("Not connected");
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = preferredlang === "es" ? "es-ES" : "en-US";
+    recognition.onresult = (e) => {
+      const text = e.results[0][0].transcript;
+      console.log("🎤 Heard:", text);
+      socket.emit("speech_text", {
+        roomId,
+        userId,
+        text,
+        sourceLang: preferredlang.slice(0, 2),
+        targetLang: preferredlang === "es" ? "en" : "es",
+      });
+    };
+    recognition.onerror = (err) => console.error("Speech recognition error:", err);
+    recognition.start();
   };
 
   // ---- 🆕 Repeat last translated audio ----
   const repeatTranslation = () => {
-    // ... (Repeat logic remains unchanged)
+    if (!lastTranslated) return alert("No translation to repeat yet!");
+    playTTS(lastTranslated, lastLang);
   };
   
   // ==========================================================
