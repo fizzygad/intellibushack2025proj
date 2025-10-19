@@ -12,9 +12,12 @@ const pool = new Pool({
 
 export const initDB = async () => {
   try {
-    await pool.query(`
-      CREATE EXTENSION IF NOT EXISTS pgcrypto;
+    // 1️⃣ Enable required extension
+    await pool.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
+    console.log("✅ pgcrypto extension checked.");
 
+    // 2️⃣ Users table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         first_name VARCHAR(100) NOT NULL,
@@ -25,15 +28,33 @@ export const initDB = async () => {
         preferredlang VARCHAR(50) NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       );
+    `);
+    console.log("✅ users table ready.");
 
-      CREATE TYPE IF NOT EXISTS item_status AS ENUM ('open', 'closed');
+    // 3️⃣ Enum type
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'item_status') THEN
+          CREATE TYPE item_status AS ENUM ('open', 'closed');
+        END IF;
+      END$$;
+    `);
+    console.log("✅ item_status type ready.");
+
+    // 4️⃣ Rooms table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS rooms (
         room_id VARCHAR(50) PRIMARY KEY,
         created_by UUID REFERENCES users(user_id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT NOW(),
         status item_status DEFAULT 'open'
       );
+    `);
+    console.log("✅ rooms table ready.");
 
+    // 5️⃣ Participants table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS participants (
         id SERIAL PRIMARY KEY,
         room_id VARCHAR(50) REFERENCES rooms(room_id) ON DELETE CASCADE,
@@ -42,7 +63,11 @@ export const initDB = async () => {
         joined_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (room_id, user_id)
       );
+    `);
+    console.log("✅ participants table ready.");
 
+    // 6️⃣ Translations table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS translations (
         id SERIAL PRIMARY KEY,
         room_id VARCHAR(50) REFERENCES rooms(room_id) ON DELETE CASCADE,
@@ -54,9 +79,15 @@ export const initDB = async () => {
         target_lang VARCHAR(10) NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       );
-      -- Index to quickly fetch all translations for a room
-      CREATE INDEX IF NOT EXISTS idx_translations_room ON translations(room_id, created_at);
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_translations_room
+      ON translations(room_id, created_at);
+    `);
+    console.log("✅ translations table ready.");
 
+    // 7️⃣ Saved phrases table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS saved_phrases (
         id SERIAL PRIMARY KEY,
         user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
@@ -66,9 +97,15 @@ export const initDB = async () => {
         target_lang VARCHAR(10) NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       );
-      -- Optional index for faster queries by language pair
-      CREATE INDEX IF NOT EXISTS idx_saved_phrases_user_lang ON saved_phrases(user_id, source_lang, target_lang);
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_saved_phrases_user_lang
+      ON saved_phrases(user_id, source_lang, target_lang);
+    `);
+    console.log("✅ saved_phrases table ready.");
 
+    // 8️⃣ User language pairs table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS user_language_pairs (
         id SERIAL PRIMARY KEY,
         user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
@@ -77,9 +114,11 @@ export const initDB = async () => {
         UNIQUE(user_id, source_lang, target_lang)
       );
     `);
+    console.log("✅ user_language_pairs table ready.");
 
-    console.log("✅ Tables initialized successfully.");
+    console.log("🎉 All tables initialized successfully.");
   } catch (err) {
     console.error("❌ Error initializing tables:", err);
+    throw err;
   }
-}; 
+};
