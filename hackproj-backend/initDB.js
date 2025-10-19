@@ -4,9 +4,10 @@ import dotenv from "dotenv";
 dotenv.config();
 const { Pool } = pkg;
 
-// Use DATABASE_URL if on Render, otherwise fallback to local Docker env
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || `postgresql://${process.env.POSTGRES_USER}:${process.env.POSTGRES_PASSWORD}@${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT}/${process.env.POSTGRES_DB}`,
+  connectionString:
+    process.env.DATABASE_URL ||
+    `postgresql://${process.env.POSTGRES_USER}:${process.env.POSTGRES_PASSWORD}@${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT}/${process.env.POSTGRES_DB}`,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
 });
 
