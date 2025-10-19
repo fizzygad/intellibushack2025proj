@@ -237,13 +237,13 @@ export default App;
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { Home } from './pages/Home';
-import { Auth } from './pages/Auth';
-import { VSTPanel } from './pages/VSTPanel';
-import { Translate } from './pages/Translate';
-import { VoiceTranslate } from './pages/VoiceTranslate';
-import { Profile } from './pages/Profile';
-import { Preferences } from './pages/Preferences';
+import { Home } from '../pages/Home';
+import { Auth } from '../pages/Auth';
+import { VSTPanel } from '../pages/VSTPanel';
+import { Translate } from '../pages/Translate';
+import { VoiceTranslate } from '../pages/VoiceTranslate';
+import { Profile } from '../pages/Profile';
+import { Preferences } from '../pages/Preferences';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
