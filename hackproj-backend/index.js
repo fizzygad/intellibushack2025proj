@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import http from "http";
 import { Server } from "socket.io";
 import pkg from "pg";
+import authRoutes from "./routes/auth.js";
 
 
 dotenv.config();
@@ -29,38 +30,40 @@ const pool = new Pool({
   database: process.env.POSTGRES_DB || "minidatabase",
 });
 
+app.use("/auth", authRoutes);
+
 app.get("/", (req, res) => res.send("Server running!"));
 
 io.on("connection", (socket) => {
-  console.log(" Connected:", socket.id);
+  console.log("Connected:", socket.id);
 
-  socket.on("join_room", async ({ roomId, userId, username }) => {
+  socket.on("join_room", async ({ roomId, userId, username, preferredlang }) => {
     socket.join(roomId);
     socket.data = { roomId, userId, username };
 
     try {
       // Ensure the user exists
       await pool.query(
-        `INSERT INTO users (user_id, username, created_at)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (user_id) DO NOTHING`,
-        [userId, username]
+        `INSERT INTO users (user_id, first_name, last_name, username, email, password_hash, preferredlang)
+         VALUES ($1, '', '', $2, '', '', $3)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [userId, username, preferredlang]
       );
 
       // Ensure the room exists
       await pool.query(
         `INSERT INTO rooms (room_id, created_at)
-        VALUES ($1, NOW())
-        ON CONFLICT (room_id) DO NOTHING`,
+         VALUES ($1, NOW())
+         ON CONFLICT (room_id) DO NOTHING`,
         [roomId]
       );
 
       // Add participant
       await pool.query(
-        `INSERT INTO participants (room_id, user_id, username, joined_at)
-        VALUES ($1, $2, $3, NOW())
-        ON CONFLICT (room_id, user_id) DO NOTHING`,
-        [roomId, userId, username]
+        `INSERT INTO participants (room_id, user_id, preferredlang, joined_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (room_id, user_id) DO NOTHING`,
+        [roomId, userId, preferredlang]
       );
 
       io.to(roomId).emit("user_joined", { userId, username });
@@ -69,7 +72,7 @@ io.on("connection", (socket) => {
     }
   });
 
-
+  
 
   socket.on("speech_text", async ({ roomId, userId, text, sourceLang, targetLang }) => {
     try {
@@ -89,9 +92,8 @@ io.on("connection", (socket) => {
       const translatedText = response.data.data.translations[0].translatedText;
 
       await pool.query(
-        `INSERT INTO translations (room_id, from_user, original_text,
-        translated_text, source_lang, target_lang, created_at) VALUES ($1, $2, $3, $4,
-        $5, $6, NOW())`,
+        `INSERT INTO translations (room_id, from_user, original_text, translated_text, source_lang, target_lang, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
         [roomId, userId, text, translatedText, sourceLang, targetLang]
       );
 
@@ -105,14 +107,13 @@ io.on("connection", (socket) => {
 
       socket.emit("translated_text", payload);       // send back to sender
       socket.to(roomId).emit("translated_text", payload); // send to others
-
     } catch (err) {
-      console.error(" Translation error:", err.message);
+      console.error("Translation error:", err.message);
       socket.emit("error_event", { message: "Translation failed." });
     }
   });
 
-  socket.on("disconnect", () => console.log(" Disconnected:", socket.id));
+  socket.on("disconnect", () => console.log("Disconnected:", socket.id));
 });
 
 const PORT = process.env.PORT || 5000;

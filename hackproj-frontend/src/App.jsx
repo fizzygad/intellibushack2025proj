@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 import SLdetector from "./SLdetector";
+import axios from "axios";
 
 const SOCKET_URL = "http://localhost:5000";
+const API_URL = "http://localhost:5000/auth";
 
 function App() {
   const [socket, setSocket] = useState(null);
@@ -14,6 +16,12 @@ function App() {
   const [lastLang, setLastLang] = useState(""); // 🆕 store last language
   const [messages, setMessages] = useState([]);
   const [voices, setVoices] = useState([]);
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [preferredlang, setPreferredlang] = useState("en");
+  const [token, setToken] = useState(null);
+
 
   // ---- Load voices on startup ----
   useEffect(() => {
@@ -64,9 +72,9 @@ function App() {
 
   // ---- Socket setup (single instance) ----
   useEffect(() => {
-    if (voices.length === 0) return; // wait until voices are ready
+    if (!token || voices.length === 0) return; // wait until voices are ready
 
-    const s = io(SOCKET_URL);
+    const s = io(SOCKET_URL, { auth: { token } });
     setSocket(s);
 
     s.on("connect", () => console.log("🟢 Connected to server"));
@@ -82,22 +90,53 @@ function App() {
     s.on("user_joined", ({ username }) => console.log(`${username} joined`));
 
     return () => s.disconnect();
-  }, [voices, playTTS]);
+  }, [token, voices, playTTS]);
+
+  // ---- Signup/Login ----
+  const handleSignup = async () => {
+    if (!username || !email || !password) return alert("Fill all fields");
+    try {
+      const res = await axios.post(`${API_URL}/signup`, { 
+        first_name: "", last_name: "", username, email, password, preferredlang 
+      });
+      setToken(res.data.token);
+      setUserId(res.data.user.user_id);
+      alert("Signup successful!");
+    } catch (err) {
+      console.error(err);
+      alert("Signup failed");
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!email || !password) return alert("Fill all fields");
+    try {
+      const res = await axios.post(`${API_URL}/login`, { emailOrUsername: email, password });
+      setToken(res.data.token);
+      setUserId(res.data.user.user_id);
+      setUsername(res.data.user.username);
+      setPreferredlang(res.data.user.preferredlang);
+      alert("Login successful!");
+    } catch (err) {
+      console.error(err);
+      alert("Login failed");
+    }
+  };
 
   // ---- Join Room ----
   const joinRoom = () => {
-    if (!socket || !username) return alert("Enter your username first!");
-    const id = crypto.randomUUID();
-    setUserId(id);
+    if (!socket) return alert("Not connected to server yet");
+    if (!roomId || !username) return alert("Enter a room ID and username");
 
-    socket.emit("join_room", { roomId, userId: id, username });
+    socket.emit("join_room", { roomId, userId, username, preferredlang });
     setJoined(true);
   };
 
   // ---- Speech-to-Text ----
   const handleSpeak = () => {
+    if (!socket) return alert("Not connected");
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = "en-US";
+    recognition.lang = preferredlang === "es" ? "es-ES" : "en-US";
     recognition.onresult = (e) => {
       const text = e.results[0][0].transcript;
       console.log("🎤 Heard:", text);
@@ -105,8 +144,8 @@ function App() {
         roomId,
         userId,
         text,
-        sourceLang: "en",
-        targetLang: "es",
+        sourceLang: preferredlang.slice(0, 2),
+        targetLang: preferredlang === "es" ? "en" : "es",
       });
     };
     recognition.onerror = (err) => console.error("Speech recognition error:", err);
@@ -122,24 +161,49 @@ function App() {
   return (
     <div style={{ padding: "2rem" }}>
       <h2>🌐 Realtime Translator</h2>
-      {!joined ? (
+
+      {!token ? (
         <div>
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Username"
-          />
-          <input
-            value={roomId}
-            onChange={(e) => setRoomId(e.target.value)}
-            placeholder="Room ID"
-          />
+          <h3>{isLogin ? "Login" : "Signup"}</h3>
+          <input value={username} onChange={e => setUsername(e.target.value)} placeholder="Username" style={{ display: isLogin ? "none" : "block" }} />
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" />
+          {!isLogin && (
+            <select value={preferredlang} onChange={e => setPreferredlang(e.target.value)}>
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="sign">Sign Language</option>
+            </select>
+          )}
+          <button onClick={isLogin ? handleLogin : handleSignup}>{isLogin ? "Login" : "Signup"}</button>
+          <p onClick={() => setIsLogin(!isLogin)} style={{ cursor: "pointer", color: "blue" }}>
+            {isLogin ? "Create an account" : "Already have an account?"}
+          </p>
+        </div>
+      ) : !joined ? (
+        <div>
+          <input value={roomId} onChange={e => setRoomId(e.target.value)} placeholder="Room ID" />
           <button onClick={joinRoom}>Join Room</button>
         </div>
       ) : (
         <div>
           <button onClick={handleSpeak}>🎙️ Speak</button>
           <button onClick={repeatTranslation}>🔁 Repeat Last</button> {/* 🆕 */}
+          {joined && preferredlang === "sign" && (
+            <SLdetector
+              onDetect={text => {
+                if (socket && text)
+                  socket.emit("speech_text", {
+                    roomId,
+                    userId,
+                    text,
+                    sourceLang: "sign",
+                    targetLang: preferredlang === "sign" ? "en" : "sign",
+                  });
+              }}
+            />
+          )}
+
           <button onClick={() => {
             const v = window.speechSynthesis.getVoices();
             if (v.length > 0) {
@@ -152,23 +216,6 @@ function App() {
           }}>
             🗣️ Initialize Voices
           </button>
-          <button onClick={() => playTTS("Hola, esto es una prueba", "es")}>
-            🔊 Test Spanish Audio
-          </button>
-          <SLdetector
-            onDetect={(text) => {
-              console.log("🤟 Detected sign:", text);
-              if (socket && text) {
-                socket.emit("speech_text", {
-                  roomId,
-                  userId,
-                  text,
-                  sourceLang: "en",
-                  targetLang: "es",
-                });
-              }
-            }}
-          />
 
           <h4>Last Translation: {lastTranslated}</h4>
           <ul>
