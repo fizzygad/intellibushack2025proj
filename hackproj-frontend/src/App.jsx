@@ -1,3 +1,4 @@
+/*
 import { useEffect, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 import SLdetector from "./SLdetector";
@@ -188,7 +189,7 @@ function App() {
       ) : (
         <div>
           <button onClick={handleSpeak}>🎙️ Speak</button>
-          <button onClick={repeatTranslation}>🔁 Repeat Last</button> {/* 🆕 */}
+          <button onClick={repeatTranslation}>🔁 Repeat Last</button> 
           {joined && preferredlang === "sign" && (
             <SLdetector
               onDetect={text => {
@@ -228,6 +229,97 @@ function App() {
         </div>
       )}
     </div>
+  );
+}
+
+export default App; 
+*/
+
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { Home } from './pages/Home';
+import { Auth } from './pages/Auth';
+import { VSTPanel } from './pages/VSTPanel';
+import { Translate } from './pages/Translate';
+import { VoiceTranslate } from './pages/VoiceTranslate';
+import { Profile } from './pages/Profile';
+import { Preferences } from './pages/Preferences';
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-sky-400 to-sky-300">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" />;
+  }
+
+  return <>{children}</>;
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/auth" element={<Auth />} />
+      <Route
+        path="/vst-panel"
+        element={
+          <ProtectedRoute>
+            <VSTPanel />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/translate/:roomCode"
+        element={
+          <ProtectedRoute>
+            <Translate />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/voice-translate/:roomCode"
+        element={
+          <ProtectedRoute>
+            <VoiceTranslate />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/preferences"
+        element={
+          <ProtectedRoute>
+            <Preferences />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 

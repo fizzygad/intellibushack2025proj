@@ -10,7 +10,7 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
 });
 
-export const initDB = async () => {
+const createTables = async () => {
   try {
     await pool.query(`
       CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -86,3 +86,5 @@ export const initDB = async () => {
     process.exit();
   }
 }; 
+
+createTables()
