@@ -6,7 +6,7 @@ import http from "http";
 import { Server } from "socket.io";
 import pkg from "pg";
 import authRoutes from "./routes/auth.js";
-
+import { initDB } from "./initDB.js";
 
 dotenv.config();
 
@@ -38,6 +38,9 @@ const pool = new Pool({
   port: process.env.POSTGRES_PORT || 5432,
   database: process.env.POSTGRES_DB || "minidatabase",
 });
+
+// Initialize DB first
+await initDB();
 
 app.use("/auth", authRoutes);
 
