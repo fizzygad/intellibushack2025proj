@@ -539,16 +539,24 @@ function App() {
                           {/* Placeholder for camera feed/SLDetector */}
                           <p>Sign Language Detector / User Video</p>
                           <SLdetector
-                              onDetect={text => {
-                                  if (socket && text)
-                                      socket.emit("speech_text", {
-                                          roomId,
-                                          userId,
-                                          text,
-                                          sourceLang: "sign",
-                                          targetLang: preferredlang === "sign" ? "en" : "sign",
-                                      });
-                              }}
+                            onDetect={text => {
+                              if (socket && text) {
+                                const payload = {
+                                  roomId,
+                                  userId,
+                                  text,
+                                  sourceLang: "sign",
+                                  targetLang: preferredlang === "sign" ? "en" : "sign",
+                                };
+                                socket.emit("speech_text", payload);
+
+                                // 🧩 Temporary frontend-side echo
+                                if (preferredlang !== "sign") {
+                                  setMessages(prev => [...prev, { from: "You", original: text, translated: text }]);
+                                  playTTS(text, preferredlang);
+                                }
+                              }
+                            }}
                           />
                       </div>
                   )}
