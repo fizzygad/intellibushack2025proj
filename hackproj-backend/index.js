@@ -53,6 +53,22 @@ io.on("connection", (socket) => {
     socket.join(roomId);
     socket.data = { roomId, userId, username };
 
+   // Notify everyone else in the room
+    socket.to(roomId).emit("notification", {
+      message: `${username} has joined the room`,
+    });
+
+    // Notify the joining user about existing users
+    const clients = await io.in(roomId).allSockets(); // Get all connected socket ids in room
+    clients.forEach(sockId => {
+      if (sockId !== socket.id) {
+        const existingUser = users[sockId]; // Map socketId -> username somewhere in memory
+        socket.emit("notification", {
+          message: `${existingUser} is in this room`,
+        });
+      }
+    });
+
     io.to(roomId).emit("room_langs", {
       langs: [user1Lang, user2Lang],
       sameLang: user1Lang === user2Lang
@@ -89,31 +105,48 @@ io.on("connection", (socket) => {
     }
   });
 
-  
-
   socket.on("speech_text", async ({ roomId, userId, text, sourceLang, targetLang }) => {
     try {
-      const response = await axios.post(
-        `https://translation.googleapis.com/language/translate/v2`,
-        {},
-        {
-          params: {
-            q: text,
-            source: sourceLang,
-            target: targetLang,
-            key: process.env.WEBSPEECH_API_KEY,
-          },
-        }
+      // --- Fetch participants in the room to check languages ---
+      const { rows: participants } = await pool.query(
+        `SELECT u.user_id, u.preferredlang
+        FROM participants p
+        JOIN users u ON p.user_id = u.user_id
+        WHERE p.room_id = $1`,
+        [roomId]
       );
 
-      const translatedText = response.data.data.translations[0].translatedText;
+      // Find if everyone has the same preferred language as the sender
+      const sender = participants.find(u => u.user_id === userId);
+      const everyoneSameLang = participants.every(u => u.preferredlang === sender.preferredlang);
 
+      let translatedText = text;
+
+      // --- Conditional: Only translate if languages differ and sourceLang is not 'sign' ---
+      if (!everyoneSameLang && sourceLang !== "sign") {
+        const response = await axios.post(
+          `https://translation.googleapis.com/language/translate/v2`,
+          {},
+          {
+            params: {
+              q: text,
+              source: sourceLang,
+              target: targetLang,
+              key: process.env.WEBSPEECH_API_KEY,
+            },
+          }
+        );
+        translatedText = response.data.data.translations[0].translatedText;
+      }
+
+      // --- Insert into DB ---
       await pool.query(
         `INSERT INTO translations (room_id, from_user, original_text, translated_text, source_lang, target_lang, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
         [roomId, userId, text, translatedText, sourceLang, targetLang]
       );
 
+      // --- Payload to frontend ---
       const payload = {
         from: userId,
         original: text,
@@ -122,13 +155,14 @@ io.on("connection", (socket) => {
         targetLang,
       };
 
-      socket.emit("translated_text", payload);       // send back to sender
+      socket.emit("translated_text", payload);          // send back to sender
       socket.to(roomId).emit("translated_text", payload); // send to others
     } catch (err) {
       console.error("Translation error:", err.message);
       socket.emit("error_event", { message: "Translation failed." });
     }
   });
+
 
   socket.on("disconnect", () => console.log("Disconnected:", socket.id));
 });

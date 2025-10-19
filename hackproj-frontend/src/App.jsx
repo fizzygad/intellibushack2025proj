@@ -150,6 +150,10 @@ function App() {
   const [preferredlang, setPreferredlang] = useState("en");
   const [token, setToken] = useState(null);
   const [sameLang, setSameLang] = useState(false);
+  const [translationHistory, setTranslationHistory] = useState([]);
+  const [savedPhrases, setSavedPhrases] = useState([]);
+  const [languagePairs, setLanguagePairs] = useState([]);
+
   
   // --- New State for Profile/Signup Forms ---
   const [firstName, setFirstName] = useState("");
@@ -175,6 +179,7 @@ function App() {
     loadVoices();
   }, []);
 
+  
   // ---- Text-to-Speech ----
   const playTTS = useCallback((text, lang) => {
     if (!text) return;
@@ -212,33 +217,41 @@ function App() {
 
     s.on("connect", () => console.log("🟢 Connected to server"));
 
-    // 🆕 Handle translation message
     s.on("translated_text", (payload) => {
       console.log("📩 Received translation:", payload);
+
+      // Determine if source and target languages are the same
+      const sameLanguage = payload.sourceLang === payload.targetLang;
+
       setMessages(prev => [...prev, payload]);
 
-      // 🆕 Conditional translation playback
-      if (sameLang) {
-        console.log("🎧 Same language detected — skipping translation playback");
-        playTTS(payload.original, payload.sourceLang); // play original
+      if (sameLanguage) {
+        // If same language, just play original text
+        playTTS(payload.original, payload.sourceLang);
       } else {
+        // Otherwise, play translated text
         playTTS(payload.translated, payload.targetLang);
       }
 
-      setLastTranslated(payload.translated);
-      setLastLang(payload.targetLang);
-    });
-
-    // 🆕 Detect if both users share the same language
-    s.on("room_langs", ({ sameLang, langs }) => {
-      console.log("🌍 Room languages:", langs);
-      setSameLang(sameLang);
+      setLastTranslated(sameLanguage ? payload.original : payload.translated);
+      setLastLang(sameLanguage ? payload.sourceLang : payload.targetLang);
     });
 
     s.on("user_joined", ({ username }) => console.log(`${username} joined`));
 
     return () => s.disconnect();
-  }, [token, voices, playTTS, sameLang]);
+  }, [token, voices, playTTS]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("notification", ({ message }) => {
+      alert(message); // Or replace with a nicer toast notification
+    });
+
+    return () => socket.off("notification");
+  }, [socket]);
+
 
   // ---- Signup/Login ----
   const handleSignup = async () => {
@@ -326,6 +339,21 @@ function App() {
     playTTS(lastTranslated, lastLang);
   };
   
+  const fetchTranslationHistory = async () => {
+    const res = await axios.get(`${API_URL}/translations/${userId}`);
+    setTranslationHistory(res.data);
+  };
+
+  const fetchSavedPhrases = async () => {
+    const res = await axios.get(`${API_URL}/saved_phrases/${userId}`);
+    setSavedPhrases(res.data);
+  };
+
+  const fetchLanguagePairs = async () => {
+    const res = await axios.get(`${API_URL}/language_pairs/${userId}`);
+    setLanguagePairs(res.data);
+  };
+
   // ==========================================================
   //                       SCREEN RENDERING                     
   // ==========================================================
@@ -447,6 +475,55 @@ function App() {
       </>
   );
 
+  const renderTranslationHistory = () => (
+    <div className="white-card">
+      <h2>Translation History</h2>
+      <ul>
+        {translationHistory.map((t, i) => (
+          <li key={i}>
+            {t.original_text} → {t.translated_text} ({t.source_lang} → {t.target_lang})
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  const renderSavedPhrases = () => (
+    <div className="white-card">
+      <h2>Saved Phrases</h2>
+      <ul>
+        {savedPhrases.map((p, i) => (
+          <li key={i}>{p.original_text} → {p.translated_text}</li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  const renderReviewMode = () => (
+    <div className="white-card">
+      <h2>Review Mode</h2>
+      <ul>
+        {translationHistory.map((t, i) => (
+          <li key={i} onClick={() => playTTS(t.translated_text, t.target_lang)}>
+            {t.original_text} → {t.translated_text}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  const renderLanguagePairs = () => (
+    <div className="white-card">
+      <h2>Language Pairs</h2>
+      <ul>
+        {languagePairs.map((p, i) => (
+          <li key={i}>{p.source_lang} → {p.target_lang}</li>
+        ))}
+      </ul>
+    </div>
+  );
+
+
   // --- 4. VST Room Screens (Shared base view) ---
   const renderVSTPanel = (isSignLang) => (
       <>
@@ -475,6 +552,8 @@ function App() {
                           />
                       </div>
                   )}
+
+
                   
                   {/* Main Controls */}
                   <div className="controls-bar">
@@ -508,11 +587,11 @@ function App() {
           <AppHeader token={token} setScreen={setScreen} />
           <div className="screen-container">
               <div className="white-card preferences-list">
-                  <h2>Preferences</h2>
-                  <a href="#" onClick={() => {/* navigate to history */}}>Translation History</a>
-                  <a href="#" onClick={() => {/* navigate to saved phrases */}}>Saved Phrases</a>
-                  <a href="#" onClick={() => {/* navigate to language pairs */}}>Language Pairs</a>
-                  <a href="#" onClick={() => {/* navigate to review mode */}}>Review Mode</a>
+                <h2>Preferences</h2>
+                <a href="#" onClick={() => { fetchTranslationHistory(); setScreen('translation-history'); }}>Translation History</a>
+                <a href="#" onClick={() => { fetchSavedPhrases(); setScreen('saved-phrases'); }}>Saved Phrases</a>
+                <a href="#" onClick={() => { fetchTranslationHistory(); setScreen('review-mode'); }}>Review Mode</a>
+                <a href="#" onClick={() => { fetchLanguagePairs(); setScreen('language-pairs'); }}>Language Pairs</a>
               </div>
           </div>
       </>
@@ -574,37 +653,27 @@ function App() {
   //                       MAIN APP SWITCH
   // ==========================================================
   
+  // Dummy render functions for history / saved / review / language pairs
+  // Render screens
   const getScreenComponent = () => {
-    // Determine the user's login state for initial routing
-    if (!token && screen !== 'auth') {
-        return renderLanding();
-    }
+    if (!token && screen !== 'auth') return renderLanding();
 
-    switch (screen) {
-        case 'auth':
-            return renderAuth();
-        case 'room-setup':
-            return renderRoomSetup();
-        case 'vst-speech':
-            return renderVSTPanel(false); // Speech-to-Speech
-        case 'vst-sign':
-            return renderVSTPanel(true);  // Sign-to-Speech
-        case 'preferences':
-            return renderPreferences();
-        case 'profile':
-            return renderProfile();
-        case 'home':
-        default:
-            // If logged in but on 'home', default to room setup
-            return token ? renderRoomSetup() : renderLanding();
+    switch(screen) {
+      case 'auth': return renderAuth();
+      case 'room-setup': return renderRoomSetup();
+      case 'vst-speech': return renderVSTPanel(false);
+      case 'vst-sign': return renderVSTPanel(true);
+      case 'preferences': return renderPreferences();
+      case 'profile': return renderProfile();
+      case 'translation-history': return renderTranslationHistory();
+      case 'saved-phrases': return renderSavedPhrases();
+      case 'review-mode': return renderReviewMode();
+      case 'language-pairs': return renderLanguagePairs();
+      case 'home':
+      default: return token ? renderRoomSetup() : renderLanding();
     }
   };
-
-  return (
-    <div className="main-app-wrapper">
-      {getScreenComponent()}
-    </div>
-  );
+  return <div className="main-app-wrapper">{getScreenComponent()}</div>;
 }
 
 export default App;
