@@ -53,6 +53,11 @@ io.on("connection", (socket) => {
     socket.join(roomId);
     socket.data = { roomId, userId, username };
 
+    io.to(roomId).emit("room_langs", {
+      langs: [user1Lang, user2Lang],
+      sameLang: user1Lang === user2Lang
+    });
+
     try {
       // Ensure the user exists
       await pool.query(
