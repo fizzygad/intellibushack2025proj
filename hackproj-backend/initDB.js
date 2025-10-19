@@ -10,12 +10,12 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
 });
 
-const createTables = async () => {
+export const initDB = async () => {
   try {
     await pool.query(`
       CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-      CREATE TABLE users (
+      CREATE TABLE IF NOT EXISTS users (
         user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         first_name VARCHAR(100) NOT NULL,
         last_name VARCHAR(100) NOT NULL,
@@ -26,15 +26,15 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT NOW()
       );
 
-      CREATE TYPE item_status AS ENUM ('open', 'closed');
-      CREATE TABLE rooms (
+      CREATE TYPE IF NOT EXISTS item_status AS ENUM ('open', 'closed');
+      CREATE TABLE IF NOT EXISTS rooms (
         room_id VARCHAR(50) PRIMARY KEY,
         created_by UUID REFERENCES users(user_id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT NOW(),
         status item_status DEFAULT 'open'
       );
 
-      CREATE TABLE participants (
+      CREATE TABLE IF NOT EXISTS participants (
         id SERIAL PRIMARY KEY,
         room_id VARCHAR(50) REFERENCES rooms(room_id) ON DELETE CASCADE,
         user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
@@ -43,7 +43,7 @@ const createTables = async () => {
         UNIQUE (room_id, user_id)
       );
 
-      CREATE TABLE translations (
+      CREATE TABLE IF NOT EXISTS translations (
         id SERIAL PRIMARY KEY,
         room_id VARCHAR(50) REFERENCES rooms(room_id) ON DELETE CASCADE,
         from_user UUID REFERENCES users(user_id) ON DELETE SET NULL,
@@ -55,9 +55,9 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT NOW()
       );
       -- Index to quickly fetch all translations for a room
-      CREATE INDEX idx_translations_room ON translations(room_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_translations_room ON translations(room_id, created_at);
 
-      CREATE TABLE saved_phrases (
+      CREATE TABLE IF NOT EXISTS saved_phrases (
         id SERIAL PRIMARY KEY,
         user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
         original_text TEXT NOT NULL,
@@ -67,9 +67,9 @@ const createTables = async () => {
         created_at TIMESTAMP DEFAULT NOW()
       );
       -- Optional index for faster queries by language pair
-      CREATE INDEX idx_saved_phrases_user_lang ON saved_phrases(user_id, source_lang, target_lang);
+      CREATE INDEX IF NOT EXISTS idx_saved_phrases_user_lang ON saved_phrases(user_id, source_lang, target_lang);
 
-      CREATE TABLE user_language_pairs (
+      CREATE TABLE IF NOT EXISTS user_language_pairs (
         id SERIAL PRIMARY KEY,
         user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
         source_lang VARCHAR(10) NOT NULL,
@@ -85,7 +85,4 @@ const createTables = async () => {
     await pool.end();
     process.exit();
   }
-};
-
-createTables();
-
+}; 

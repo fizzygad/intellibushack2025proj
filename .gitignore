@@ -1,3 +1,4 @@
 .env
 .dockerignore
 docker-compose.yml
+omnivst-mobile/
